@@ -54,3 +54,21 @@ function setKmsCryptoKeyName(keyName) {
   return { configured: true };
 }
 
+// Zero-arg smoke test: verifies KMS_CRYPTO_KEY_NAME is set and the deploying
+// user can actually encrypt with it (API enabled + IAM permission granted).
+// Run from the editor before entering real patient CIDs.
+function testKmsAccess() {
+  const keyName = PropertiesService.getScriptProperties().getProperty('KMS_CRYPTO_KEY_NAME');
+  if (!keyName || !/^projects\/.+\/locations\/.+\/keyRings\/.+\/cryptoKeys\/.+$/.test(keyName)) {
+    return { ok: false, message: 'ยังไม่ได้ตั้ง KMS_CRYPTO_KEY_NAME หรือรูปแบบไม่ถูกต้อง' };
+  }
+  const response = UrlFetchApp.fetch('https://cloudkms.googleapis.com/v1/' + keyName + ':encrypt', {
+    method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+    headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() },
+    payload: JSON.stringify({ plaintext: Utilities.base64Encode('kms-access-test') })
+  });
+  const code = response.getResponseCode();
+  if (code >= 200 && code < 300) return { ok: true, keyName: keyName, message: 'KMS encrypt สำเร็จ — key และสิทธิ์พร้อมใช้งาน' };
+  return { ok: false, status: code, message: 'KMS encrypt ล้มเหลว: ' + response.getContentText().slice(0, 300) };
+}
+
