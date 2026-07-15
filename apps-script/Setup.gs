@@ -31,6 +31,34 @@ function createInitialSuperAdmin(username, password, displayName, organizationId
   return { userId: userId, username: normalized, role: 'SUPER_ADMIN' };
 }
 
+function bootstrapUserFromProperties() {
+  const properties = PropertiesService.getScriptProperties();
+  const username = normalizeUsername_(properties.getProperty('BOOTSTRAP_USERNAME'));
+  const password = String(properties.getProperty('BOOTSTRAP_PASSWORD') || '');
+  const role = String(properties.getProperty('BOOTSTRAP_ROLE') || 'SUPER_ADMIN').trim().toUpperCase();
+  const displayName = String(properties.getProperty('BOOTSTRAP_DISPLAY_NAME') || '').trim();
+  const organizationId = String(properties.getProperty('BOOTSTRAP_ORG_ID') || '').trim();
+  const email = String(properties.getProperty('BOOTSTRAP_EMAIL') || '').trim();
+
+  if (!username) throw new Error('BOOTSTRAP_USERNAME is required');
+  if (!password) throw new Error('BOOTSTRAP_PASSWORD is required');
+  if (!ROLE_PERMISSIONS[role]) throw new Error('INVALID_ROLE: ' + role + ' (valid: ' + Object.keys(ROLE_PERMISSIONS).join(', ') + ')');
+  validatePasswordPolicy_(password);
+  if (findRecordByField_('USERS', 'username', username)) throw new Error('USERNAME_EXISTS');
+
+  const now = new Date().toISOString();
+  const userId = Utilities.getUuid();
+  appendRecord_('USERS', {
+    user_id: userId, username: username, email: email, password_hash: createPasswordHash_(password),
+    display_name: displayName || username, professional_no: '', role_code: role, organization_id: organizationId,
+    service_unit_id: '', status: 'ACTIVE', last_login_at: '', failed_login_count: 0, locked_until: '',
+    must_change_password: true, scopes_json: '{}', created_at: now, created_by: 'SYSTEM', updated_at: now, updated_by: 'SYSTEM', row_version: 1, is_active: true
+  });
+  appendAudit_({ actorUserId: userId, organizationId: organizationId, actionCode: 'USER_BOOTSTRAP', entityType: 'USER', entityId: userId });
+  properties.deleteProperty('BOOTSTRAP_PASSWORD');
+  return { userId: userId, username: username, role: role, mustChangePassword: true, passwordPropertyDeleted: true };
+}
+
 function migrateToV020() {
   const sheet = getDataSheet_('USERS');
   const required = ['failed_login_count','locked_until','must_change_password','scopes_json'];
