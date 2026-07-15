@@ -5,6 +5,7 @@ function initializeSystem() {
     const config = getRuntimeConfig_();
     if (!config.spreadsheetId) throw new Error('กรุณากำหนด SPREADSHEET_ID ใน Script Properties');
     const spreadsheet = SpreadsheetApp.openById(config.spreadsheetId);
+    compactExistingSheets_(spreadsheet);
     const summary = [];
     Object.keys(SHEET_SCHEMAS).forEach(function (sheetName) {
       summary.push(ensureSheet_(spreadsheet, sheetName, getHeadersForSheet_(sheetName)));
@@ -31,9 +32,24 @@ function ensureSheet_(spreadsheet, sheetName, headers) {
     sheet.setFrozenRows(1);
     sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#0f766e').setFontColor('#ffffff');
     sheet.autoResizeColumns(1, headers.length);
-    sheet.getRange('A:ZZ').setNumberFormat('@');
+    sheet.getRange(1, 1, sheet.getMaxRows(), headers.length).setNumberFormat('@');
   }
+  const surplusColumns = sheet.getMaxColumns() - headers.length;
+  if (surplusColumns > 0) sheet.deleteColumns(headers.length + 1, surplusColumns);
   return { sheetName: sheetName, created: created, columns: headers.length };
+}
+
+// Trim schema sheets that were previously expanded to 702 columns (A:ZZ bug),
+// freeing cells so initializeSystem can create the remaining sheets under the
+// 10M-cell workbook limit. Only removes empty surplus columns beyond the schema.
+function compactExistingSheets_(spreadsheet) {
+  spreadsheet.getSheets().forEach(function (sheet) {
+    const name = sheet.getName();
+    if (!SHEET_SCHEMAS[name]) return;
+    const width = getHeadersForSheet_(name).length;
+    const surplus = sheet.getMaxColumns() - width;
+    if (surplus > 0) sheet.deleteColumns(width + 1, surplus);
+  });
 }
 
 function seedSettings_(spreadsheet) {
