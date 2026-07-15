@@ -68,7 +68,10 @@ function testKmsAccess() {
     payload: JSON.stringify({ plaintext: Utilities.base64Encode('kms-access-test') })
   });
   const code = response.getResponseCode();
-  if (code >= 200 && code < 300) return { ok: true, keyName: keyName, message: 'KMS encrypt สำเร็จ — key และสิทธิ์พร้อมใช้งาน' };
-  return { ok: false, status: code, message: 'KMS encrypt ล้มเหลว: ' + response.getContentText().slice(0, 300) };
+  const result = (code >= 200 && code < 300)
+    ? { ok: true, keyName: keyName, message: 'KMS encrypt สำเร็จ — key และสิทธิ์พร้อมใช้งาน' }
+    : { ok: false, status: code, message: 'KMS encrypt ล้มเหลว: ' + response.getContentText().slice(0, 300) };
+  console.log(JSON.stringify(result));
+  return result;
 }
 
