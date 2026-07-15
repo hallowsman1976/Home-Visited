@@ -112,6 +112,30 @@ function archivePatient_(auth, payload, requestId) {
   return { archived: true };
 }
 
+function setPatientCid_(auth, payload, requestId) {
+  requirePermission_(auth.user, 'patients.write');
+  const found = findRecordByField_('PATIENTS', 'patient_id', String(payload.patientId || '').toLowerCase());
+  if (!found) throw createAppError_('NOT_FOUND', 'ไม่พบผู้ป่วย');
+  if (!isEntityInScope_(auth.user, found.record)) throw createAppError_('FORBIDDEN', 'ไม่มีสิทธิ์แก้ไขข้อมูลนี้');
+  if (!payload.cid || !validateCid_(payload.cid)) { const error = createAppError_('VALIDATION_ERROR', 'ข้อมูลผู้ป่วยไม่ถูกต้อง'); error.fieldErrors = { cid: 'เลขประจำตัวประชาชนไม่ถูกต้อง' }; throw error; }
+  const organizationId = String(found.record.organization_id || '');
+  const cidHash = hashCidForLookup_(payload.cid);
+  const now = new Date().toISOString();
+  const lock = LockService.getScriptLock(); lock.waitLock(30000);
+  try {
+    if (buildPatientIdentifierMap_()[String(found.record.patient_id)]) throw createAppError_('CONFLICT', 'ผู้ป่วยรายนี้มีเลขประจำตัวประชาชนอยู่แล้ว');
+    if (findRecordByField_('PATIENT_IDENTIFIERS', 'identifier_hash', cidHash)) throw createAppError_('CONFLICT', 'เลขประจำตัวประชาชนนี้มีในระบบแล้ว');
+    const cidEncrypted = encryptCid_(payload.cid, found.record.patient_id, organizationId);
+    appendRecord_('PATIENT_IDENTIFIERS', {
+      identifier_id: Utilities.getUuid(), patient_id: found.record.patient_id, organization_id: organizationId, identifier_type: 'CID', identifier_encrypted: cidEncrypted,
+      identifier_hash: cidHash, last4: normalizeCid_(payload.cid).slice(-4), verified_at: '', verified_by: '',
+      created_at: now, created_by: auth.user.user_id, updated_at: now, updated_by: auth.user.user_id, row_version: 1, is_active: true
+    });
+  } finally { lock.releaseLock(); }
+  appendAudit_({ requestId: requestId, actorUserId: auth.user.user_id, organizationId: organizationId, actionCode: 'PATIENT_SET_CID', entityType: 'PATIENT', entityId: found.record.patient_id });
+  return { patientId: found.record.patient_id, cidMasked: maskCidLast4_(normalizeCid_(payload.cid).slice(-4)) };
+}
+
 function findPatientByHnInOrganization_(hn, organizationId) {
   const sheet = getDataSheet_('PATIENTS'); if (sheet.getLastRow() < 2) return null;
   const rows = sheet.getDataRange().getValues(); const headers = rows[0];

@@ -37,6 +37,7 @@ function doPost(e) {
     if (body.action === 'patients.create') return successResponse_(createPatient_(auth, body.payload || {}, effectiveRequestId), effectiveRequestId);
     if (body.action === 'patients.update') return successResponse_(updatePatient_(auth, body.payload || {}, effectiveRequestId), effectiveRequestId);
     if (body.action === 'patients.archive') return successResponse_(archivePatient_(auth, body.payload || {}, effectiveRequestId), effectiveRequestId);
+    if (body.action === 'patients.setCid') return successResponse_(setPatientCid_(auth, body.payload || {}, effectiveRequestId), effectiveRequestId);
     if (body.action === 'caregivers.add') return successResponse_(addCaregiver_(auth, body.payload || {}, effectiveRequestId), effectiveRequestId);
     if (body.action === 'visits.list') return successResponse_(listVisits_(auth,body.payload||{},effectiveRequestId),effectiveRequestId);
     if (body.action === 'visits.get') return successResponse_(getVisit_(auth,body.payload||{},effectiveRequestId),effectiveRequestId);
