@@ -1,0 +1,3 @@
+import type { VitalSigns } from '../types/api';
+export function calculateBmi(weight: number|'',height:number|''){if(!weight||!height)return '';return Math.round((Number(weight)/Math.pow(Number(height)/100,2))*100)/100;}
+export function validateVitals(v:VitalSigns){const errors:Record<string,string>={};const range=(key:keyof VitalSigns,min:number,max:number,label:string)=>{const value=v[key];if(value!==''&&value!==undefined&&(Number(value)<min||Number(value)>max))errors[key]=`${label}อยู่นอกช่วง`;};range('temperatureC',25,45,'อุณหภูมิ');range('pulseBpm',20,250,'ชีพจร');range('systolicBp',40,300,'ความดันตัวบน');range('diastolicBp',20,200,'ความดันตัวล่าง');range('spo2Percent',30,100,'SpO2');range('painScore',0,10,'Pain score');return errors;}
